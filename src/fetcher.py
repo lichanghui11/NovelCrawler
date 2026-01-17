@@ -1,195 +1,61 @@
-"""
-Phase 2: 抓取阶段（简化版）
-顺序抓取章节内容，解析、存储为 TXT
-"""
-
-import logging
-import os
+# -*- coding: utf-8 -*-
 import requests
 from lxml import etree
+import time
+import logging
 
-from src.utils import Config, Database
-
-
-class ContentParser:
-    """章节内容解析器"""
-
-    def __init__(self):
-        self.logger = logging.getLogger("novel_crawler.content_parser")
-
-    def parse(self, html: str, default_title: str = ""):
-        """
-        解析章节内容
-
-        Args:
-            html: 章节页 HTML
-            default_title: 默认标题（如果解析失败）
-
-        Returns:
-            (title, content) 元组
-        """
-        tree = etree.HTML(html)
-
-        # 解析标题
-        title_xpath_options = [
-            '//div[@id="chapter"]//h1//text()',
-            '//div[@class="content"]//h1//text()',
-            '//h1[@class="title"]//text()',
-            "//h1//text()",
-        ]
-
-        title = default_title
-        for xpath in title_xpath_options:
-            title_elem = tree.xpath(xpath)
-            if title_elem:
-                title = title_elem[0].strip()
-                break
-
-        # 解析正文段落
-        content_xpath_options = [
-            '//body[@id="chapter"]/div[@class="content"]/p',
-            '//div[@class="content"]/p',
-            '//div[@id="content"]/p',
-            "//article//p",
-        ]
-
-        paragraphs = []
-        for xpath in content_xpath_options:
-            p_elems = tree.xpath(xpath)
-            if p_elems:
-                for p in p_elems:
-                    text = etree.tostring(p, method="text", encoding="unicode").strip()
-                    if text and len(text) > 10:  # 过滤太短的段落
-                        paragraphs.append(text)
-                break
-
-        if not paragraphs:
-            self.logger.warning(f"未解析到正文内容: {title}")
-            raise ValueError("未找到章节内容")
-
-        # 合并段落
-        content = "\n\n".join(paragraphs)
-
-        return title, content
+from src.config import HEADERS, REQUEST_DELAY_SECONDS
 
 
-class SimpleFetcher:
-    """简化的章节抓取器（同步、顺序执行）"""
+def _parse_content(html_text: str):
+    """从 HTML 中解析正文内容"""
+    tree = etree.HTML(html_text)
+    if tree is None:
+        return None
 
-    def __init__(self):
-        self.config = Config()
-        self.db = Database(self.config.get("database.path"))
-        self.logger = logging.getLogger("novel_crawler.fetcher")
-        self.parser = ContentParser()
+    p_elements = tree.xpath('//body[@id="chapter"]/div[@class="content"]/p')
+    paragraphs = []
+    for p in p_elements:
+        text = p.text_content().strip()
+        if text:
+            paragraphs.append(text)
 
-        # 输出目录
-        self.chapters_dir = self.config.get("output.chapters_dir", "output/chapters")
-        os.makedirs(self.chapters_dir, exist_ok=True)
+    return "\n\n".join(paragraphs) if paragraphs else None
 
-        # 创建 HTTP session（复用连接）
-        self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "User-Agent": self.config.get(
-                    "http.user_agent", "Mozilla/5.0 (compatible; NovelCrawler/1.0)"
-                )
-            }
-        )
 
-    def fetch_chapter(self, task):
-        """
-        抓取单个章节
+def run_fetcher(chapters_to_fetch: list):
+    """
+    抓取阶段：接收章节列表，抓取内容，返回包含内容的完整列表。
+    Args:
+        chapters_to_fetch (list): 从 discovery 阶段获取的章节信息列表。
+    Returns:
+        list: 包含完整内容的章节列表 [{'title': str, 'content': str}]。
+    """
+    logging.info(f"开始抓取 {len(chapters_to_fetch)} 个章节...")
+    completed_chapters = []
+    total = len(chapters_to_fetch)
 
-        Args:
-            task: ChapterTask 对象
-        """
-        self.logger.info(f"[{task.chapter_index}] 开始抓取: {task.title}")
+    for i, chapter_info in enumerate(chapters_to_fetch, 1):
+        url = chapter_info["url"]
+        title = chapter_info["title"]
+        logging.info(f"  -> 正在抓取 [{i}/{total}]: {title}")
 
         try:
-            # 1. 发送 HTTP 请求
-            response = self.session.get(
-                task.url, timeout=self.config.get("http.read_timeout", 30)
-            )
-            response.raise_for_status()  # 检查 HTTP 错误
-            response.encoding = "utf-8"  # 设置编码
-            html = response.text
+            response = requests.get(url, headers=HEADERS, timeout=15)
+            response.raise_for_status()
+            response.encoding = "utf-8"
 
-            # 2. 解析标题和内容
-            title, content = self.parser.parse(html, default_title=task.title)
+            content = _parse_content(response.text)
+            if content:
+                completed_chapters.append({"title": title, "content": content})
+            else:
+                logging.warning(f"  - 警告: 未能从 {url} 提取到正文内容。")
 
-            # 3. 保存为 TXT 文件
-            file_path = os.path.join(
-                self.chapters_dir, f"{task.chapter_index:04d}_{title}.txt"
-            )
+        except requests.RequestException as e:
+            logging.error(f"  - 错误: 抓取章节失败 {url} - {e}")
 
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(f"{title}\n\n")
-                f.write(content)
+        # 礼貌性延迟
+        time.sleep(REQUEST_DELAY_SECONDS)
 
-            # 4. 更新数据库状态
-            self.db.update_task_status(task.id, status="done", content_path=file_path)
-
-            self.logger.info(f"[{task.chapter_index}] ✓ 完成: {task.title}")
-
-        except requests.HTTPError as e:
-            # HTTP 错误
-            self.logger.error(f"[{task.chapter_index}] HTTP 错误: {e}")
-            self.db.update_task_status(
-                task.id, status="failed", error=f"HTTP {e.response.status_code}"
-            )
-
-        except ValueError as e:
-            # 解析失败
-            self.logger.warning(f"[{task.chapter_index}] 解析失败: {e}")
-            self.db.update_task_status(task.id, status="skipped", error=str(e))
-
-        except Exception as e:
-            # 其他错误
-            self.logger.error(f"[{task.chapter_index}] 未知错误: {e}")
-            self.db.update_task_status(task.id, status="failed", error=str(e))
-
-    def run(self):
-        """
-        运行抓取流程（顺序执行）
-        """
-        self.logger.info("开始抓取章节...")
-
-        # 获取所有待处理任务
-        tasks = self.db.get_pending_tasks()
-
-        if not tasks:
-            self.logger.info("没有待处理任务")
-            return
-
-        self.logger.info(f"找到 {len(tasks)} 个待处理章节")
-
-        # 顺序处理每个章节
-        for index, task in enumerate(tasks, 1):
-            self.fetch_chapter(task)
-
-            # 打印进度
-            if index % 10 == 0:  # 每 10 章打印一次
-                self._print_progress()
-
-        # 最终进度
-        self._print_progress()
-        self.logger.info("抓取完成！")
-
-    def _print_progress(self):
-        """打印进度统计"""
-        stats = self.db.get_progress_stats()
-        progress_pct = (stats.done / stats.total * 100) if stats.total > 0 else 0
-
-        self.logger.info(
-            f"进度: {stats.done}/{stats.total} ({progress_pct:.1f}%) | "
-            f"待处理: {stats.pending} | 失败: {stats.failed} | 跳过: {stats.skipped}"
-        )
-
-
-def run_fetcher():
-    """运行抓取阶段的入口函数"""
-    from src.utils import setup_logger
-
-    setup_logger()
-    fetcher = SimpleFetcher()
-    fetcher.run()
+    logging.info(f"抓取完成。成功获取 {len(completed_chapters)}/{total} 个章节的内容。")
+    return completed_chapters
