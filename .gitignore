@@ -1,0 +1,110 @@
+# ==================== Python ====================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+
+# ==================== IDE ====================
+# PyCharm
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==================== 项目特定 ====================
+# 数据库文件
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 日志文件
+logs/
+*.log
+
+# 输出文件
+output/
+*.epub
+*.txt
+*.html
+*.xhtml
+
+# 配置文件（如果包含敏感信息）
+# config.yaml  # 取消注释如果不想提交配置
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+*~
+
+# ==================== OS ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ==================== 其他 ====================
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# 环境变量
+.env
+.env.local
