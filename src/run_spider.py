@@ -90,7 +90,7 @@ def get_catalog():
 
         book_meta = {
             "title": book_title,
-            "cover.file_name": alt + ".jpg",
+            "cover_file_name": alt + ".jpg",
             "author": book_author,
             "latest_chapter": book_latest_chapter,
             "updated_at": book_updated_at,
@@ -311,6 +311,8 @@ def get_content():
                             should_continue = True
 
                 if not should_continue:
+                    # 将当前章节对应的目录元数据的 status 设置为 completed
+                    catalog[chapter_id]["status"] = "completed"
                     break
 
             except Exception as e:

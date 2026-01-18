@@ -16,6 +16,7 @@ import logging
 # 从 src 包中导入核心工作流函数
 from src.run_spider import get_catalog, get_content
 from src.config import OUTPUT_DIR
+from src.exporter import EpubExporter
 
 
 def main():
@@ -38,6 +39,9 @@ def main():
     try:
         get_catalog()
         get_content()
+        export = EpubExporter()
+        export.run()
+
     except Exception:
         # 捕获从工作流抛出的任何未处理异常
         logging.critical("程序因致命错误而终止。")
