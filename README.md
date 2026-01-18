@@ -93,7 +93,7 @@ python main.py
 
 在开发过程中积累的技术文档已归档在 `docs/` 目录下，点击下方链接可直接查看：
 
-*   **数据结构设计**: 为什么选择数组存储段落？纯文本还是 HTML？
-*   **爬虫核心逻辑**: 翻页死循环的教训、智能翻页判断、双层循环架构。
-*   **资源文件处理**: 图片下载的二进制模式 (`wb`)、路径拼接 (`os.path.join` vs `urljoin`)。
-*   **工程化配置**: Logging 模块的配置陷阱、异常处理原则。
+*   **[数据结构设计](docs/01_data_structure.md)**: 为什么选择数组存储段落？纯文本还是 HTML？
+*   **[爬虫核心逻辑](docs/02_crawler_logic.md)**: 翻页死循环的教训、智能翻页判断、双层循环架构。
+*   **[资源文件处理](docs/03_resources_handling.md)**: 图片下载的二进制模式 (`wb`)、路径拼接 (`os.path.join` vs `urljoin`)。
+*   **[工程化配置](docs/04_logging_setup.md)**: Logging 模块的配置陷阱、异常处理原则。
